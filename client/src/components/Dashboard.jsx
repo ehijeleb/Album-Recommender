@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import AlbumCard from './AlbumCard'
+import BASE from '../api'
 
 const SUGGESTIONS = [
   'smooth jazz for a rainy evening',
@@ -19,7 +20,7 @@ export default function Dashboard({ onLogout }) {
   const [lastQuery, setLastQuery] = useState('')
 
   useEffect(() => {
-    fetch('/api/profile', { credentials: 'include' })
+    fetch(`${BASE}/api/profile`, { credentials: 'include' })
       .then((r) => r.json())
       .then(setProfile)
       .catch(console.error)
@@ -36,7 +37,7 @@ export default function Dashboard({ onLogout }) {
     setLastQuery(q)
 
     try {
-      const res = await fetch('/api/recommend', {
+      const res = await fetch(`${BASE}/api/recommend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -53,7 +54,7 @@ export default function Dashboard({ onLogout }) {
   }
 
   const handleLogout = async () => {
-    await fetch('/auth/logout', { credentials: 'include' })
+    await fetch(`${BASE}/auth/logout`, { credentials: 'include' })
     onLogout()
   }
 

@@ -1,3 +1,5 @@
+import BASE from '../api'
+
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
@@ -36,7 +38,7 @@ export default function LoginPage() {
         </div>
 
         <a
-          href="/auth/login"
+          href={`${BASE}/auth/login`}
           className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-400 active:bg-green-600 text-black font-bold py-4 px-8 rounded-full text-base transition-colors shadow-lg shadow-green-500/20"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">

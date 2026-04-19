@@ -15,7 +15,9 @@ const PORT = 3001;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-app.use(cors({ origin: /^http:\/\/localhost:\d+$/, credentials: true }));
+const allowedOrigins = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/]
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret',
@@ -26,7 +28,9 @@ app.use(session({
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = 'http://127.0.0.1:3001/auth/callback';
+const REDIRECT_URI = process.env.BACKEND_URL
+  ? `${process.env.BACKEND_URL}/auth/callback`
+  : 'http://127.0.0.1:3001/auth/callback';
 const SCOPES = [
   'user-top-read',
   'user-library-read',

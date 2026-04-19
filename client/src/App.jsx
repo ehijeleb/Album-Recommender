@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
+import BASE from './api'
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false)
@@ -12,7 +13,7 @@ function App() {
       window.history.replaceState({}, '', '/')
     }
 
-    fetch('/auth/status', { credentials: 'include' })
+    fetch(`${BASE}/auth/status`, { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => {
         setAuthenticated(data.authenticated)
