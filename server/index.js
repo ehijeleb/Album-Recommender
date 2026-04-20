@@ -29,7 +29,7 @@ app.use(session({
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.BACKEND_URL
-  ? `${process.env.BACKEND_URL}/auth/callback`
+  ? `${process.env.BACKEND_URL.replace(/\/$/, '')}/auth/callback`
   : 'http://127.0.0.1:3001/auth/callback';
 const SCOPES = [
   'user-top-read',
