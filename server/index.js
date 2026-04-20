@@ -109,6 +109,8 @@ app.get('/api/profile', async (req, res) => {
       topArtists: topArtists.items.map((a) => a.name),
     });
   } catch (err) {
+    const status = err.response?.status;
+    if (status === 401 || status === 403) return res.status(401).json({ error: 'Token expired' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -214,6 +216,8 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
     res.json({ recommendations: verified });
   } catch (err) {
     console.error('Recommend error:', err);
+    const status = err.response?.status;
+    if (status === 401 || status === 403) return res.status(401).json({ error: 'Token expired' });
     res.status(500).json({ error: err.message });
   }
 });

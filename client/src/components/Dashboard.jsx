@@ -21,8 +21,11 @@ export default function Dashboard({ onLogout }) {
 
   useEffect(() => {
     authFetch('/api/profile')
-      .then((r) => r.json())
-      .then(setProfile)
+      .then((r) => {
+        if (r.status === 401) { onLogout(); return null }
+        return r.json()
+      })
+      .then((data) => { if (data) setProfile(data) })
       .catch(console.error)
   }, [])
 
@@ -41,6 +44,7 @@ export default function Dashboard({ onLogout }) {
         method: 'POST',
         body: JSON.stringify({ query: q }),
       })
+      if (res.status === 401) { onLogout(); return }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setRecommendations(data.recommendations)
