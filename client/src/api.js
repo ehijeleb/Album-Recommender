@@ -1,4 +1,5 @@
 const BASE = import.meta.env.VITE_API_URL || ''
+export const BACKEND = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001'
 
 export default BASE
 
