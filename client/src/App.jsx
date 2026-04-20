@@ -1,26 +1,32 @@
 import { useState, useEffect } from 'react'
 import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
-import BASE from './api'
 
 function App() {
-  const [authenticated, setAuthenticated] = useState(false)
+  const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('auth') === 'success') {
+    const urlToken = params.get('token')
+
+    if (urlToken) {
+      localStorage.setItem('spotify_token', urlToken)
       window.history.replaceState({}, '', '/')
+      setToken(urlToken)
+      setLoading(false)
+      return
     }
 
-    fetch(`${BASE}/auth/status`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((data) => {
-        setAuthenticated(data.authenticated)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    const stored = localStorage.getItem('spotify_token')
+    if (stored) setToken(stored)
+    setLoading(false)
   }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem('spotify_token')
+    setToken(null)
+  }
 
   if (loading) {
     return (
@@ -30,8 +36,8 @@ function App() {
     )
   }
 
-  return authenticated
-    ? <Dashboard onLogout={() => setAuthenticated(false)} />
+  return token
+    ? <Dashboard token={token} onLogout={handleLogout} />
     : <LoginPage />
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import AlbumCard from './AlbumCard'
-import BASE from '../api'
+import { authFetch } from '../api'
 
 const SUGGESTIONS = [
   'smooth jazz for a rainy evening',
@@ -20,7 +20,7 @@ export default function Dashboard({ onLogout }) {
   const [lastQuery, setLastQuery] = useState('')
 
   useEffect(() => {
-    fetch(`${BASE}/api/profile`, { credentials: 'include' })
+    authFetch('/api/profile')
       .then((r) => r.json())
       .then(setProfile)
       .catch(console.error)
@@ -37,10 +37,8 @@ export default function Dashboard({ onLogout }) {
     setLastQuery(q)
 
     try {
-      const res = await fetch(`${BASE}/api/recommend`, {
+      const res = await authFetch('/api/recommend', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ query: q }),
       })
       const data = await res.json()
@@ -51,15 +49,6 @@ export default function Dashboard({ onLogout }) {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleLogout = async () => {
-    await fetch(`${BASE}/auth/logout`, { credentials: 'include' })
-    onLogout()
-  }
-
-  const handleSuggestion = (s) => {
-    setQuery(s)
   }
 
   return (
@@ -82,7 +71,7 @@ export default function Dashboard({ onLogout }) {
               )}
               <span className="text-zinc-400 text-sm hidden sm:block">{profile.name}</span>
               <button
-                onClick={handleLogout}
+                onClick={onLogout}
                 className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
               >
                 Logout
@@ -121,7 +110,7 @@ export default function Dashboard({ onLogout }) {
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => handleSuggestion(s)}
+                  onClick={() => setQuery(s)}
                   className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs px-4 py-2 rounded-full transition-colors"
                 >
                   {s}

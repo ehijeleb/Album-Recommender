@@ -1,5 +1,4 @@
 import express from 'express';
-import session from 'express-session';
 import cors from 'cors';
 import axios from 'axios';
 import Groq from 'groq-sdk';
@@ -11,30 +10,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const allowedOrigins = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/]
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000
-  }
-}));
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
 const REDIRECT_URI = process.env.BACKEND_URL
   ? `${process.env.BACKEND_URL.replace(/\/$/, '')}/auth/callback`
   : 'http://127.0.0.1:3001/auth/callback';
+
 const SCOPES = [
   'user-top-read',
   'user-library-read',
@@ -55,7 +46,7 @@ app.get('/auth/login', (req, res) => {
 
 app.get('/auth/callback', async (req, res) => {
   const { code, error } = req.query;
-  if (error) return res.redirect('http://localhost:5173?auth=error');
+  if (error) return res.redirect(`${FRONTEND_URL}?auth=error`);
 
   try {
     const response = await axios.post(
@@ -72,23 +63,19 @@ app.get('/auth/callback', async (req, res) => {
         },
       }
     );
-    req.session.accessToken = response.data.access_token;
-    req.session.refreshToken = response.data.refresh_token;
-    res.redirect(`${process.env.FRONTEND_URL || 'http://127.0.0.1:5173'}?auth=success`);
+    const token = response.data.access_token;
+    res.redirect(`${FRONTEND_URL}?token=${token}`);
   } catch (err) {
     console.error('Auth error:', err.response?.data || err.message);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://127.0.0.1:5173'}?auth=error`);
+    res.redirect(`${FRONTEND_URL}?auth=error`);
   }
 });
 
-app.get('/auth/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
-});
-
-app.get('/auth/status', (req, res) => {
-  res.json({ authenticated: !!req.session.accessToken });
-});
+function getToken(req) {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
 
 async function spotifyGet(endpoint, token) {
   const res = await axios.get(`https://api.spotify.com/v1${endpoint}`, {
@@ -98,11 +85,12 @@ async function spotifyGet(endpoint, token) {
 }
 
 app.get('/api/profile', async (req, res) => {
-  if (!req.session.accessToken) return res.status(401).json({ error: 'Not authenticated' });
+  const token = getToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const [profile, topArtists] = await Promise.all([
-      spotifyGet('/me', req.session.accessToken),
-      spotifyGet('/me/top/artists?limit=5&time_range=medium_term', req.session.accessToken),
+      spotifyGet('/me', token),
+      spotifyGet('/me/top/artists?limit=5&time_range=medium_term', token),
     ]);
     res.json({
       name: profile.display_name,
@@ -115,16 +103,17 @@ app.get('/api/profile', async (req, res) => {
 });
 
 app.post('/api/recommend', async (req, res) => {
-  if (!req.session.accessToken) return res.status(401).json({ error: 'Not authenticated' });
+  const token = getToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
   const { query } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
 
   try {
     const [topArtists, topTracks, savedAlbums, recentlyPlayed] = await Promise.all([
-      spotifyGet('/me/top/artists?limit=20&time_range=medium_term', req.session.accessToken),
-      spotifyGet('/me/top/tracks?limit=20&time_range=medium_term', req.session.accessToken),
-      spotifyGet('/me/albums?limit=50', req.session.accessToken),
-      spotifyGet('/me/player/recently-played?limit=20', req.session.accessToken),
+      spotifyGet('/me/top/artists?limit=20&time_range=medium_term', token),
+      spotifyGet('/me/top/tracks?limit=20&time_range=medium_term', token),
+      spotifyGet('/me/albums?limit=50', token),
+      spotifyGet('/me/player/recently-played?limit=20', token),
     ]);
 
     const artistNames = topArtists.items.map((a) => a.name).join(', ');
@@ -180,7 +169,7 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
         try {
           const searchResult = await spotifyGet(
             `/search?q=${encodeURIComponent(`album:${rec.album} artist:${rec.artist}`)}&type=album&limit=1`,
-            req.session.accessToken
+            token
           );
           const album = searchResult.albums?.items[0];
           return {
@@ -202,5 +191,5 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
