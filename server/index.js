@@ -84,6 +84,17 @@ async function spotifyGet(endpoint, token) {
   return res.data;
 }
 
+async function getAllSavedAlbums(token) {
+  let albums = [];
+  let url = '/me/albums?limit=50';
+  while (url) {
+    const data = await spotifyGet(url, token);
+    albums = albums.concat(data.items);
+    url = data.next ? data.next.replace('https://api.spotify.com/v1', '') : null;
+  }
+  return albums;
+}
+
 app.get('/api/profile', async (req, res) => {
   const token = getToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
@@ -112,17 +123,25 @@ app.post('/api/recommend', async (req, res) => {
     const [topArtists, topTracks, savedAlbums, recentlyPlayed] = await Promise.all([
       spotifyGet('/me/top/artists?limit=20&time_range=medium_term', token),
       spotifyGet('/me/top/tracks?limit=20&time_range=medium_term', token),
-      spotifyGet('/me/albums?limit=50', token),
+      getAllSavedAlbums(token),
       spotifyGet('/me/player/recently-played?limit=20', token),
     ]);
 
     const artistNames = topArtists.items.map((a) => a.name).join(', ');
     const genres = [...new Set(topArtists.items.flatMap((a) => a.genres))].slice(0, 15).join(', ');
     const trackNames = topTracks.items.map((t) => `${t.name} by ${t.artists[0].name}`).join(', ');
-    const savedAlbumList = savedAlbums.items.map((i) => `${i.album.name} by ${i.album.artists[0].name}`);
     const recentTrackNames = recentlyPlayed.items
       .map((i) => `${i.track.name} by ${i.track.artists[0].name}`)
       .join(', ');
+
+    // Build full exclusion set — saved albums + albums from top tracks
+    const savedAlbumList = savedAlbums.map((i) => `${i.album.name} by ${i.album.artists[0].name}`);
+    const topTrackAlbums = topTracks.items.map((t) => `${t.album.name} by ${t.artists[0].name}`);
+    const allKnownAlbums = [...new Set([...savedAlbumList, ...topTrackAlbums])];
+
+    // Normalise for post-filter comparison
+    const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const knownSet = new Set(allKnownAlbums.map(normalize));
 
     const prompt = `You are an expert music curator with deep knowledge of albums across all genres and eras. Recommend 5 albums based on this user's Spotify listening profile and their specific request.
 
@@ -132,12 +151,12 @@ USER'S TASTE PROFILE:
 - Top Tracks: ${trackNames || 'Not available'}
 - Recently Played: ${recentTrackNames || 'Not available'}
 
-ALBUMS ALREADY IN THEIR LIBRARY (do NOT recommend these):
-${savedAlbumList.length > 0 ? savedAlbumList.join('\n') : 'None'}
+ALBUMS ALREADY IN THEIR LIBRARY — DO NOT RECOMMEND ANY OF THESE:
+${allKnownAlbums.length > 0 ? allKnownAlbums.join('\n') : 'None'}
 
 USER'S REQUEST: "${query}"
 
-Recommend exactly 5 real albums that match the request and complement their taste. Do not recommend anything from their library.
+Recommend exactly 5 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
 
 Respond with ONLY a valid JSON array — no markdown, no code blocks, no explanation:
 [
@@ -162,7 +181,13 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('Could not parse recommendations from AI response');
 
-    const recommendations = JSON.parse(jsonMatch[0]);
+    const rawRecommendations = JSON.parse(jsonMatch[0]);
+
+    // Post-filter: remove any album the AI recommended that's already in the library
+    const recommendations = rawRecommendations.filter((rec) => {
+      const key = normalize(`${rec.album}${rec.artist}`);
+      return !knownSet.has(key);
+    });
 
     const recommendationsWithArt = await Promise.all(
       recommendations.map(async (rec) => {
