@@ -156,7 +156,7 @@ ${allKnownAlbums.length > 0 ? allKnownAlbums.join('\n') : 'None'}
 
 USER'S REQUEST: "${query}"
 
-Recommend exactly 5 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
+Recommend exactly 8 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
 
 Respond with ONLY a valid JSON array — no markdown, no code blocks, no explanation:
 [
@@ -189,26 +189,29 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
       return !knownSet.has(key);
     });
 
-    const recommendationsWithArt = await Promise.all(
-      recommendations.map(async (rec) => {
-        try {
-          const searchResult = await spotifyGet(
-            `/search?q=${encodeURIComponent(`album:${rec.album} artist:${rec.artist}`)}&type=album&limit=1`,
-            token
-          );
-          const album = searchResult.albums?.items[0];
-          return {
-            ...rec,
-            albumArt: album?.images[0]?.url || null,
-            spotifyUrl: album?.external_urls?.spotify || null,
-          };
-        } catch {
-          return { ...rec, albumArt: null, spotifyUrl: null };
-        }
-      })
-    );
+    const verified = (
+      await Promise.all(
+        recommendations.map(async (rec) => {
+          try {
+            const searchResult = await spotifyGet(
+              `/search?q=${encodeURIComponent(`album:${rec.album} artist:${rec.artist}`)}&type=album&limit=1`,
+              token
+            );
+            const album = searchResult.albums?.items[0];
+            if (!album) return null;
+            return {
+              ...rec,
+              albumArt: album.images[0]?.url || null,
+              spotifyUrl: album.external_urls?.spotify || null,
+            };
+          } catch {
+            return null;
+          }
+        })
+      )
+    ).filter(Boolean).slice(0, 5);
 
-    res.json({ recommendations: recommendationsWithArt });
+    res.json({ recommendations: verified });
   } catch (err) {
     console.error('Recommend error:', err);
     res.status(500).json({ error: err.message });
