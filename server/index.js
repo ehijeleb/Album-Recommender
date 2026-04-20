@@ -156,7 +156,7 @@ ${allKnownAlbums.length > 0 ? allKnownAlbums.join('\n') : 'None'}
 
 USER'S REQUEST: "${query}"
 
-Recommend exactly 8 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
+Recommend exactly 15 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
 
 Respond with ONLY a valid JSON array — no markdown, no code blocks, no explanation:
 [
