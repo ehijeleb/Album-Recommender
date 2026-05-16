@@ -222,6 +222,51 @@ Respond with ONLY a valid JSON array — no markdown, no code blocks, no explana
   }
 });
 
+app.get('/api/suggestions', async (req, res) => {
+  const token = getToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const topArtists = await spotifyGet('/me/top/artists?limit=20&time_range=medium_term', token);
+    const artistNames = topArtists.items.slice(0, 10).map((a) => a.name).join(', ');
+    const genres = [...new Set(topArtists.items.flatMap((a) => a.genres))].slice(0, 15).join(', ');
+
+    const prompt = `Based on this listener's Spotify taste, generate 6 short search prompts they would realistically want to type into a music recommender. Each prompt mixes a mood, scene, or activity with a sonic palette that genuinely matches their taste. Do NOT suggest genres they don't already listen to.
+
+TOP ARTISTS: ${artistNames || 'Not available'}
+TOP GENRES: ${genres || 'Not available'}
+
+Rules:
+- 5 to 9 words per prompt
+- Natural, lowercase, no quotes
+- Mix moods (rainy evening, late night, summer drive) with sonic styles drawn from their genres
+- Each prompt should feel distinct in vibe from the others
+- No genre alone (bad: "jazz") — always tie it to a mood, time, or activity
+
+Respond with ONLY a valid JSON array of 6 strings, no markdown, no explanation:
+["prompt one", "prompt two", "prompt three", "prompt four", "prompt five", "prompt six"]`;
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.85,
+    });
+
+    let text = completion.choices[0].message.content.trim();
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('Could not parse suggestions from AI response');
+    const suggestions = JSON.parse(match[0]).filter((s) => typeof s === 'string' && s.length > 0).slice(0, 6);
+
+    res.json({ suggestions });
+  } catch (err) {
+    console.error('Suggestions error:', err);
+    const status = err.response?.status;
+    if (status === 401 || status === 403) return res.status(401).json({ error: 'Token expired' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

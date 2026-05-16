@@ -1,15 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AlbumCard from './AlbumCard'
 import { authFetch } from '../api'
 
-const SUGGESTIONS = [
-  { label: 'Smooth jazz for a rainy evening', dot: 'bg-sky-400' },
-  { label: 'Energetic hip-hop to work out to', dot: 'bg-orange-400' },
-  { label: 'Late night lo-fi chill', dot: 'bg-violet-400' },
-  { label: 'Melancholic indie folk', dot: 'bg-amber-300' },
-  { label: 'Classic rock anthems', dot: 'bg-red-400' },
-  { label: 'Upbeat summer pop', dot: 'bg-pink-400' },
+const DOT_COLORS = [
+  'bg-sky-400',
+  'bg-orange-400',
+  'bg-violet-400',
+  'bg-amber-300',
+  'bg-emerald-400',
+  'bg-pink-400',
 ]
+
+const FALLBACK_SUGGESTIONS = [
+  'smooth jazz for a rainy evening',
+  'late night lo-fi chill',
+  'energetic hip-hop to work out to',
+  'upbeat summer pop',
+  'cinematic instrumental focus',
+  'mellow soul for a slow morning',
+]
+
+const SUGGESTIONS_CACHE_KEY = 'album_finder_suggestions_v1'
 
 const SpotifyMark = ({ className = 'w-4 h-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -41,6 +52,30 @@ export default function Dashboard({ profile, onLogout }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [lastQuery, setLastQuery] = useState('')
+  const [suggestions, setSuggestions] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem(SUGGESTIONS_CACHE_KEY)
+      if (cached) return JSON.parse(cached)
+    } catch {}
+    return null
+  })
+
+  useEffect(() => {
+    if (suggestions) return
+    let cancelled = false
+    authFetch('/api/suggestions')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        const list = Array.isArray(data?.suggestions) && data.suggestions.length > 0
+          ? data.suggestions
+          : FALLBACK_SUGGESTIONS
+        setSuggestions(list)
+        try { sessionStorage.setItem(SUGGESTIONS_CACHE_KEY, JSON.stringify(list)) } catch {}
+      })
+      .catch(() => { if (!cancelled) setSuggestions(FALLBACK_SUGGESTIONS) })
+    return () => { cancelled = true }
+  }, [suggestions])
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -182,17 +217,26 @@ export default function Dashboard({ profile, onLogout }) {
 
         {isIdle && (
           <div className="animate-fade-up" style={{ animationDelay: '200ms' }}>
-            <div className="flex flex-wrap justify-center gap-2 mb-12">
-              {SUGGESTIONS.map(({ label, dot }) => (
-                <button
-                  key={label}
-                  onClick={() => setQuery(label)}
-                  className="group flex items-center gap-2 bg-zinc-900/50 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 text-xs px-3.5 py-2 rounded-full transition-all duration-200 backdrop-blur-sm"
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${dot} opacity-70 group-hover:opacity-100`} />
-                  {label}
-                </button>
-              ))}
+            <div className="flex flex-wrap justify-center gap-2 mb-12 min-h-[5rem]">
+              {suggestions === null
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="skeleton h-8 rounded-full"
+                      style={{ width: `${110 + ((i * 37) % 90)}px` }}
+                    />
+                  ))
+                : suggestions.map((label, i) => (
+                    <button
+                      key={label}
+                      onClick={() => setQuery(label)}
+                      className="group flex items-center gap-2 bg-zinc-900/50 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 text-xs px-3.5 py-2 rounded-full transition-all duration-200 backdrop-blur-sm animate-fade-up"
+                      style={{ animationDelay: `${i * 50}ms` }}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[i % DOT_COLORS.length]} opacity-70 group-hover:opacity-100`} />
+                      {label}
+                    </button>
+                  ))}
             </div>
 
             {profile?.topArtists?.length > 0 && (
