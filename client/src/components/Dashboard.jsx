@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import AlbumCard from './AlbumCard'
 import { authFetch } from '../api'
 
@@ -35,23 +35,12 @@ function SkeletonCard() {
   )
 }
 
-export default function Dashboard({ onLogout }) {
-  const [profile, setProfile] = useState(null)
+export default function Dashboard({ profile, onLogout }) {
   const [query, setQuery] = useState('')
   const [recommendations, setRecommendations] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [lastQuery, setLastQuery] = useState('')
-
-  useEffect(() => {
-    authFetch('/api/profile')
-      .then((r) => {
-        if (r.status === 401) { onLogout(); return null }
-        return r.json()
-      })
-      .then((data) => { if (data) setProfile(data) })
-      .catch(console.error)
-  }, [])
 
   const handleSearch = async (e) => {
     e.preventDefault()
