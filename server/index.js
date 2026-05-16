@@ -14,6 +14,30 @@ const PORT = process.env.PORT || 3001;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+async function groqJson({ prompt, key, temperature = 0.7, retries = 1 }) {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature,
+        response_format: { type: 'json_object' },
+      });
+      const parsed = JSON.parse(completion.choices[0].message.content);
+      const value = parsed[key];
+      if (!Array.isArray(value)) throw new Error(`Groq response missing array "${key}"`);
+      return value;
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        console.warn(`Groq attempt ${attempt + 1} failed (${err.message}); retrying`);
+      }
+    }
+  }
+  throw lastError;
+}
+
 const allowedOrigins = [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/]
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
 app.use(cors({ origin: allowedOrigins }));
@@ -160,30 +184,21 @@ USER'S REQUEST: "${query}"
 
 Recommend exactly 15 real albums the user has NOT heard before. Triple-check that none of your recommendations appear in the library list above before responding.
 
-Respond with ONLY a valid JSON array — no markdown, no code blocks, no explanation:
-[
-  {
-    "album": "Album Name",
-    "artist": "Artist Name",
-    "year": "2019",
-    "genre": "Genre",
-    "reason": "One sentence explaining why this fits their taste and request",
-    "mood": "One word mood label"
-  }
-]`;
+Respond with a JSON object in this exact shape:
+{
+  "recommendations": [
+    {
+      "album": "Album Name",
+      "artist": "Artist Name",
+      "year": "2019",
+      "genre": "Genre",
+      "reason": "One sentence explaining why this fits their taste and request",
+      "mood": "One word mood label"
+    }
+  ]
+}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-    });
-    let text = completion.choices[0].message.content.trim();
-
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('Could not parse recommendations from AI response');
-
-    const rawRecommendations = JSON.parse(jsonMatch[0]);
+    const rawRecommendations = await groqJson({ prompt, key: 'recommendations', temperature: 0.7 });
 
     // Post-filter: remove any album the AI recommended that's already in the library
     const recommendations = rawRecommendations.filter((rec) => {
@@ -243,20 +258,13 @@ Rules:
 - Each prompt should feel distinct in vibe from the others
 - No genre alone (bad: "jazz") — always tie it to a mood, time, or activity
 
-Respond with ONLY a valid JSON array of 6 strings, no markdown, no explanation:
-["prompt one", "prompt two", "prompt three", "prompt four", "prompt five", "prompt six"]`;
+Respond with a JSON object in this exact shape:
+{
+  "suggestions": ["prompt one", "prompt two", "prompt three", "prompt four", "prompt five", "prompt six"]
+}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.85,
-    });
-
-    let text = completion.choices[0].message.content.trim();
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error('Could not parse suggestions from AI response');
-    const suggestions = JSON.parse(match[0]).filter((s) => typeof s === 'string' && s.length > 0).slice(0, 6);
+    const raw = await groqJson({ prompt, key: 'suggestions', temperature: 0.85 });
+    const suggestions = raw.filter((s) => typeof s === 'string' && s.length > 0).slice(0, 6);
 
     res.json({ suggestions });
   } catch (err) {
