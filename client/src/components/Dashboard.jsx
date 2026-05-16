@@ -144,7 +144,7 @@ export default function Dashboard({ profile, onLogout }) {
           <label htmlFor="vibe-search" className="sr-only">Describe a vibe or mood</label>
           <div className="group relative">
             <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500/0 via-green-500/0 to-green-500/0 group-focus-within:from-green-500/20 group-focus-within:via-emerald-400/10 group-focus-within:to-indigo-500/20 blur-xl transition-all duration-500" aria-hidden="true" />
-            <div className="relative flex items-center bg-zinc-900/80 border border-zinc-800 focus-within:border-green-500/60 rounded-full pl-5 pr-1.5 py-1.5 transition-colors backdrop-blur-sm">
+            <div className="relative flex items-center bg-zinc-900/80 border border-zinc-800 focus-within:border-green-500 rounded-full pl-5 pr-1.5 py-1.5 transition-colors duration-200 backdrop-blur-sm">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500 flex-shrink-0" aria-hidden="true">
                 <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
               </svg>
